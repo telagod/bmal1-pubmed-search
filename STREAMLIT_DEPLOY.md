@@ -1,0 +1,246 @@
+# 🚀 Streamlit Cloud 部署指南
+
+**项目**: BMAL1 PubMed Search System v3.0
+**仓库**: https://github.com/telagod/bmal1-pubmed-search
+
+---
+
+## 📋 部署步骤
+
+### 第一步：访问Streamlit Cloud
+
+1. 打开浏览器，访问：https://share.streamlit.io/
+2. 使用GitHub账号登录
+
+### 第二步：创建新应用
+
+1. 点击右上角的 **"New app"** 按钮
+2. 在弹出的对话框中填写：
+   - **Repository**: `telagod/bmal1-pubmed-search`
+   - **Branch**: `main`
+   - **Main file path**: `streamlit_app.py`
+   - **App URL** (可选): 自定义应用URL，如 `bmal1-search`
+
+### 第三步：配置Secrets（重要！）
+
+1. 点击 **"Advanced settings"**
+2. 在 **"Secrets"** 部分，添加以下内容：
+
+```toml
+pubmed_email = "your-email@example.com"
+api_key = "your-ncbi-api-key"
+```
+
+**注意**：
+- 请将 `your-email@example.com` 替换为您的PubMed注册邮箱
+- 请将 `your-ncbi-api-key` 替换为您的NCBI API密钥
+- 如果没有API密钥，请访问：https://www.ncbi.nlm.nih.gov/account/settings/
+
+### 第四步：部署
+
+1. 检查所有配置无误
+2. 点击 **"Deploy!"** 按钮
+3. 等待几分钟，Streamlit会自动：
+   - 克隆仓库
+   - 安装依赖（从requirements.txt）
+   - 启动应用
+
+### 第五步：访问应用
+
+部署成功后，您会看到：
+- ✅ 部署成功的提示
+- 🔗 应用的公开访问链接（如 https://bmal1-search.streamlit.app）
+
+---
+
+## 🔧 配置说明
+
+### Secrets格式
+
+Streamlit Cloud使用TOML格式的Secrets，与.env文件格式不同：
+
+**.env格式**（本地使用）：
+```
+pubmed_email:your-email@example.com
+api_key:your-api-key
+```
+
+**Secrets格式**（Streamlit Cloud）：
+```toml
+pubmed_email = "your-email@example.com"
+api_key = "your-api-key"
+```
+
+### 代码中的Secrets访问
+
+`config_manager.py` 已经配置为自动从Streamlit Secrets加载配置：
+
+```python
+# 自动尝试从Streamlit secrets加载
+if 'streamlit' in sys.modules:
+    try:
+        import streamlit as st
+        if hasattr(st, 'secrets'):
+            self.pubmed_config.email = st.secrets.get('pubmed_email', '')
+            self.pubmed_config.api_key = st.secrets.get('api_key', '')
+    except:
+        pass
+```
+
+---
+
+## 📝 更新应用
+
+### 方法1：推送代码更新
+
+```bash
+# 修改代码后
+git add .
+git commit -m "Update: description of changes"
+git push
+```
+
+Streamlit Cloud会自动检测到更新并重新部署。
+
+### 方法2：手动重启
+
+1. 访问 https://share.streamlit.io/
+2. 找到您的应用
+3. 点击菜单 → **"Reboot app"**
+
+---
+
+## 🔍 监控和调试
+
+### 查看日志
+
+1. 在Streamlit Cloud应用页面
+2. 点击右下角的 **"Manage app"**
+3. 查看 **"Logs"** 标签页
+
+### 常见问题
+
+#### 1. 部署失败：ModuleNotFoundError
+
+**原因**：requirements.txt缺少依赖
+
+**解决**：
+- 检查requirements.txt是否包含所有必需的包
+- 确保版本号正确
+
+#### 2. 应用启动后提示"配置验证失败"
+
+**原因**：Secrets未正确配置
+
+**解决**：
+- 检查Secrets格式是否正确（TOML格式）
+- 确保Email和API Key有效
+- 重启应用
+
+#### 3. 数据库相关错误
+
+**原因**：Streamlit Cloud是无状态的，每次重启会清空临时文件
+
+**解决**：
+- 数据库会在首次搜索时自动创建
+- 重要数据请导出到本地
+- 或考虑使用云数据库（如Supabase）
+
+---
+
+## 🎯 最佳实践
+
+### 1. 使用环境变量
+
+不要在代码中硬编码敏感信息，始终使用Secrets。
+
+### 2. 定期备份
+
+定期导出配置和搜索结果：
+- 在"设置"页面导出配置
+- 在"数据分析"导出数据
+
+### 3. 监控使用量
+
+注意Streamlit Cloud的使用限制：
+- 免费版：1个应用，1GB存储
+- 社区版限制可能会变化
+
+### 4. 优化性能
+
+- 使用 `@st.cache_resource` 缓存数据
+- 避免频繁的数据库查询
+- 合理设置搜索参数
+
+---
+
+## 📊 应用URL
+
+部署成功后，您的应用将在以下URL可访问：
+
+**主要地址**：
+```
+https://[your-app-name].streamlit.app
+```
+
+**备用地址**：
+```
+https://share.streamlit.io/telagod/bmal1-pubmed-search/main/streamlit_app.py
+```
+
+---
+
+## 🔒 安全建议
+
+1. **不要公开分享Secrets**
+   - Secrets仅在Streamlit Cloud后台配置
+   - 不要提交到Git仓库
+
+2. **定期更新API Key**
+   - 定期在NCBI更新API密钥
+   - 在Streamlit Cloud同步更新Secrets
+
+3. **监控使用情况**
+   - 检查应用访问日志
+   - 注意异常的API调用
+
+---
+
+## 📞 技术支持
+
+### Streamlit Cloud文档
+- https://docs.streamlit.io/streamlit-community-cloud
+
+### PubMed API文档
+- https://www.ncbi.nlm.nih.gov/books/NBK25501/
+
+### GitHub仓库
+- https://github.com/telagod/bmal1-pubmed-search
+
+---
+
+## ✅ 部署检查清单
+
+部署前请确认：
+
+- [ ] 代码已推送到GitHub
+- [ ] requirements.txt包含所有依赖
+- [ ] .gitignore已配置（排除.env和敏感文件）
+- [ ] 获取了有效的PubMed Email和API Key
+- [ ] 在Streamlit Cloud配置了Secrets
+- [ ] 选择了正确的仓库和分支
+- [ ] 主文件路径设置为 `streamlit_app.py`
+
+部署后请验证：
+
+- [ ] 应用成功启动
+- [ ] 设置页面可以正常访问
+- [ ] API配置有效（显示"已配置"）
+- [ ] 可以执行搜索
+- [ ] 数据能正常保存和显示
+
+---
+
+**祝部署顺利喵～** ฅ'ω'ฅ
+
+如有问题，请查看应用日志或提交Issue到GitHub仓库。

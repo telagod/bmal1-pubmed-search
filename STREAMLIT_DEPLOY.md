@@ -1,7 +1,7 @@
 # 🚀 Streamlit Cloud 部署指南
 
 **项目**: 通用 PubMed 文献检索系统 v3.3 (最佳实践版)
-**仓库**: https://github.com/telagod/bmal1-pubmed-search
+**仓库**: https://github.com/telagod/pubmed-search-app
 
 ## 🆕 v3.3 特性
 
@@ -23,7 +23,7 @@
 
 1. 点击右上角的 **"New app"** 按钮
 2. 在弹出的对话框中填写：
-   - **Repository**: `telagod/bmal1-pubmed-search`
+   - **Repository**: `telagod/pubmed-search-app`
    - **Branch**: `main`
    - **Main file path**: `streamlit_app.py`
    - **App URL** (可选): 自定义应用URL，如 `bmal1-search`
@@ -214,7 +214,7 @@ https://[your-app-name].streamlit.app
 
 **备用地址**：
 ```
-https://share.streamlit.io/telagod/bmal1-pubmed-search/main/streamlit_app.py
+https://share.streamlit.io/telagod/pubmed-search-app/main/streamlit_app.py
 ```
 
 ---
@@ -244,7 +244,7 @@ https://share.streamlit.io/telagod/bmal1-pubmed-search/main/streamlit_app.py
 - https://www.ncbi.nlm.nih.gov/books/NBK25501/
 
 ### GitHub仓库
-- https://github.com/telagod/bmal1-pubmed-search
+- https://github.com/telagod/pubmed-search-app
 
 ---
 

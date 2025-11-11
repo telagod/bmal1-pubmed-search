@@ -56,8 +56,8 @@ workflow/
 ## 快速开始
 ```bash
 # 克隆并进入目录
-git clone https://github.com/telagod/bmal1-pubmed-search.git
-cd bmal1-pubmed-search
+git clone https://github.com/telagod/pubmed-search-app.git
+cd pubmed-search-app
 
 # 准备环境（uv）
 uv venv

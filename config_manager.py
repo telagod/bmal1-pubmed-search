@@ -114,8 +114,11 @@ class ConfigManager:
         if (not self.pubmed_config.email) or (not self.pubmed_config.api_key):
             spec = importlib.util.find_spec("streamlit")
             if spec is not None:
-                import streamlit as st  # noqa: WPS433
-                if hasattr(st, "secrets"):
+                # 只有在 secrets.toml 存在时才访问 st.secrets，避免本地未配置时报错
+                home_secrets = Path.home() / ".streamlit" / "secrets.toml"
+                local_secrets = Path(__file__).parent / ".streamlit" / "secrets.toml"
+                if home_secrets.exists() or local_secrets.exists():
+                    import streamlit as st  # noqa: WPS433
                     email = st.secrets.get('pubmed_email', '')
                     key = st.secrets.get('api_key', '')
                     if email:

@@ -25,10 +25,10 @@ class LocalDataManager:
         """初始化数据管理器"""
         # 使用session_state存储临时数据库路径
         if 'db_path' not in st.session_state:
-            st.session_state.db_path = None
+            st.session_state['db_path'] = None
 
         if 'db_initialized' not in st.session_state:
-            st.session_state.db_initialized = False
+            st.session_state['db_initialized'] = False
 
     def get_db_path(self) -> Optional[Path]:
         """
@@ -37,12 +37,13 @@ class LocalDataManager:
         Returns:
             数据库路径，如果没有则返回None
         """
-        return st.session_state.db_path
+        p = st.session_state.get('db_path')
+        return Path(p) if p else None
 
     def has_database(self) -> bool:
         """检查是否有可用的数据库"""
-        return (st.session_state.db_path is not None and
-                Path(st.session_state.db_path).exists())
+        p = st.session_state.get('db_path')
+        return bool(p) and Path(p).exists()
 
     def create_temp_database(self) -> Path:
         """
@@ -64,8 +65,8 @@ class LocalDataManager:
         self._init_database_schema(temp_path)
 
         # 保存到session_state
-        st.session_state.db_path = str(temp_path)
-        st.session_state.db_initialized = True
+        st.session_state['db_path'] = str(temp_path)
+        st.session_state['db_initialized'] = True
 
         return temp_path
 
@@ -140,9 +141,9 @@ class LocalDataManager:
 
             # 验证是否为有效的数据库文件
             if self._validate_database(temp_path):
-                st.session_state.db_path = str(temp_path)
-                st.session_state.db_initialized = True
-                st.session_state.db_token = datetime.now().isoformat()
+                st.session_state['db_path'] = str(temp_path)
+                st.session_state['db_initialized'] = True
+                st.session_state['db_token'] = datetime.now().isoformat()
                 return True
             else:
                 # 删除无效文件
@@ -184,7 +185,10 @@ class LocalDataManager:
             return None
 
         try:
-            db_path = Path(st.session_state.db_path)
+            p = st.session_state.get('db_path')
+            if not p:
+                return None
+            db_path = Path(p)
             with open(db_path, 'rb') as f:
                 return f.read()
         except Exception as e:
@@ -202,7 +206,15 @@ class LocalDataManager:
             }
 
         try:
-            db_path = Path(st.session_state.db_path)
+            p = st.session_state.get('db_path')
+            db_path = Path(p) if p else None
+            if not db_path:
+                return {
+                    'exists': False,
+                    'paper_count': 0,
+                    'search_count': 0,
+                    'size': 0
+                }
             conn = sqlite3.connect(str(db_path))
             cursor = conn.cursor()
 
@@ -217,7 +229,7 @@ class LocalDataManager:
             conn.close()
 
             # 获取文件大小
-            size = db_path.stat().st_size
+            size = db_path.stat().st_size if db_path.exists() else 0
 
             return {
                 'exists': True,
@@ -237,14 +249,15 @@ class LocalDataManager:
         """清空当前数据库"""
         if self.has_database():
             try:
-                db_path = Path(st.session_state.db_path)
-                db_path.unlink()
+                p = st.session_state.get('db_path')
+                if p:
+                    Path(p).unlink()
             except Exception:
                 pass
 
-        st.session_state.db_path = None
-        st.session_state.db_initialized = False
-        st.session_state.db_token = datetime.now().isoformat()
+        st.session_state['db_path'] = None
+        st.session_state['db_initialized'] = False
+        st.session_state['db_token'] = datetime.now().isoformat()
 
     def ensure_database(self) -> Path:
         """
@@ -255,7 +268,8 @@ class LocalDataManager:
         """
         if not self.has_database():
             return self.create_temp_database()
-        return Path(st.session_state.db_path)
+        p = st.session_state.get('db_path')
+        return Path(p) if p else None
 
 
 # 全局数据管理器实例

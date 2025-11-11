@@ -280,14 +280,14 @@ def init_db(db_path: str):
 
 # ==================== 缓存工具函数 ====================
 @st.cache_data(show_spinner=False)
-def get_all_papers_cached(db_path: str, mtime: float) -> pd.DataFrame:
+def get_all_papers_cached(db_path: str, mtime: float, token: str) -> pd.DataFrame:
     """按数据库路径与修改时间缓存的文献全量读取"""
     db = PaperDB(Path(db_path))
     return db.get_all_papers()
 
 
 @st.cache_data(show_spinner=False)
-def get_stats_cached(db_path: str, mtime: float) -> Dict:
+def get_stats_cached(db_path: str, mtime: float, token: str) -> Dict:
     """按数据库路径与修改时间缓存的统计信息"""
     db = PaperDB(Path(db_path))
     return db.get_statistics()
@@ -313,6 +313,18 @@ def filter_papers_df(df: pd.DataFrame, keyword: str = "", strategy: str = "", ye
         df = df[(df['pub_year'].astype(str) >= y1) & (df['pub_year'].astype(str) <= y2)]
 
     return df
+
+
+def get_cache_token() -> str:
+    """返回当前数据缓存令牌，用于手动失效缓存"""
+    if 'db_token' not in st.session_state:
+        st.session_state.db_token = '0'
+    return st.session_state.db_token
+
+
+def bump_cache_token():
+    """递增缓存令牌以触发缓存失效"""
+    st.session_state.db_token = datetime.now().isoformat()
 
 
 # ==================== 页面：数据管理 (首页) ====================
@@ -919,6 +931,7 @@ def _execute_search(config_manager, query: str, name: str,
                 """, unsafe_allow_html=True)
 
                 st.success("您现在可以在\"📊 Dashboard\"和\"📚 文献浏览\"中查看结果")
+                bump_cache_token()
 
             else:
                 st.markdown(
@@ -950,7 +963,7 @@ def page_dashboard():
     # 绑定数据库路径, 确保切换后缓存失效
     dm = get_data_manager()
     p = dm.ensure_database()
-    stats = get_stats_cached(str(p), p.stat().st_mtime)
+    stats = get_stats_cached(str(p), p.stat().st_mtime, get_cache_token())
 
     if not stats:
         st.warning("⚠️ 数据库为空或无法访问,请先上传数据库或执行搜索")
@@ -1076,7 +1089,7 @@ def page_browser():
 
     dm = get_data_manager()
     p = dm.ensure_database()
-    stats = get_stats_cached(str(p), p.stat().st_mtime)
+    stats = get_stats_cached(str(p), p.stat().st_mtime, get_cache_token())
 
     if not stats:
         st.warning("⚠️ 数据库为空,请先上传数据库或执行搜索")
@@ -1108,7 +1121,7 @@ def page_browser():
     per_page = st.sidebar.selectbox("每页显示", [10, 20, 50, 100], index=1)
 
     # 执行搜索
-    df_all = get_all_papers_cached(str(p), p.stat().st_mtime)
+    df_all = get_all_papers_cached(str(p), p.stat().st_mtime, get_cache_token())
     sel = selected_strategy if selected_strategy != "全部" else ""
     df = filter_papers_df(df_all, keyword=keyword, strategy=sel, year_range=year_range)
 
@@ -1202,7 +1215,7 @@ def page_analysis():
 
     dm = get_data_manager()
     p = dm.ensure_database()
-    df = get_all_papers_cached(str(p), p.stat().st_mtime)
+    df = get_all_papers_cached(str(p), p.stat().st_mtime, get_cache_token())
 
     if df.empty:
         st.warning("⚠️ 数据库为空,请先上传数据库或执行搜索")

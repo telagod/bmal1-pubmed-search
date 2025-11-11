@@ -15,6 +15,7 @@ import tempfile
 import shutil
 from typing import Optional
 import io
+from datetime import datetime
 
 
 class LocalDataManager:
@@ -139,9 +140,9 @@ class LocalDataManager:
 
             # 验证是否为有效的数据库文件
             if self._validate_database(temp_path):
-                # 保存路径
                 st.session_state.db_path = str(temp_path)
                 st.session_state.db_initialized = True
+                st.session_state.db_token = datetime.now().isoformat()
                 return True
             else:
                 # 删除无效文件
@@ -238,11 +239,12 @@ class LocalDataManager:
             try:
                 db_path = Path(st.session_state.db_path)
                 db_path.unlink()
-            except:
+            except Exception:
                 pass
 
         st.session_state.db_path = None
         st.session_state.db_initialized = False
+        st.session_state.db_token = datetime.now().isoformat()
 
     def ensure_database(self) -> Path:
         """

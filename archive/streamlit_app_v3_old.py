@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Archived: legacy v3.0 UI preserved for reference. Not used by app.
 """
 BMAL1文献检索系统 - 高级版 Streamlit WebUI
 ==========================================

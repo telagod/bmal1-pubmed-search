@@ -23,7 +23,7 @@
 
 #### 脚本说明
 
-**v1脚本** - `pubmed_search_bmal1.py` (已废弃)
+**v1脚本** - `archive/pubmed_search_bmal1.py` (已废弃)
 - 初始版本，存在解析错误问题
 
 **v2脚本** - `pubmed_search_v2.py` ⭐ (当前版本)
@@ -45,7 +45,7 @@
 #### 输出结构
 ```
 workflow/
-├── pubmed_search_bmal1.py      # v1检索脚本（已废弃）
+├── archive/pubmed_search_bmal1.py  # v1检索脚本（已废弃）
 ├── pubmed_search_v2.py         # v2检索脚本（优化版）⭐
 ├── streamlit_app.py            # Streamlit可视化应用 🎨
 ├── STREAMLIT_GUIDE.md          # 可视化使用指南

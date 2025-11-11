@@ -273,12 +273,46 @@ def init_config_manager():
 
 
 @st.cache_resource
-def init_db():
-    """初始化数据库连接（带缓存）"""
-    # 使用数据管理器确保数据库存在
-    data_manager = get_data_manager()
-    db_path = data_manager.ensure_database()
-    return PaperDB(db_path)
+def init_db(db_path: str):
+    """初始化数据库连接（带缓存, 绑定路径以便切换数据库时失效）"""
+    return PaperDB(Path(db_path))
+
+
+# ==================== 缓存工具函数 ====================
+@st.cache_data(show_spinner=False)
+def get_all_papers_cached(db_path: str, mtime: float) -> pd.DataFrame:
+    """按数据库路径与修改时间缓存的文献全量读取"""
+    db = PaperDB(Path(db_path))
+    return db.get_all_papers()
+
+
+@st.cache_data(show_spinner=False)
+def get_stats_cached(db_path: str, mtime: float) -> Dict:
+    """按数据库路径与修改时间缓存的统计信息"""
+    db = PaperDB(Path(db_path))
+    return db.get_statistics()
+
+
+def filter_papers_df(df: pd.DataFrame, keyword: str = "", strategy: str = "", year_range: tuple | None = None) -> pd.DataFrame:
+    """基于关键词/策略/年份对DataFrame进行筛选"""
+    if df.empty:
+        return df
+
+    if keyword:
+        key = keyword.lower()
+        by_title = df['title'].str.lower().str.contains(key, na=False)
+        by_abs = df['abstract'].str.lower().str.contains(key, na=False)
+        by_kw = df['keywords'].apply(lambda xs: any(key in k.lower() for k in xs))
+        df = df[by_title | by_abs | by_kw]
+
+    if strategy and strategy != "全部":
+        df = df[df['search_strategy'] == strategy]
+
+    if year_range:
+        y1, y2 = str(year_range[0]), str(year_range[1])
+        df = df[(df['pub_year'].astype(str) >= y1) & (df['pub_year'].astype(str) <= y2)]
+
+    return df
 
 
 # ==================== 页面：数据管理 (首页) ====================
@@ -913,8 +947,10 @@ def page_dashboard():
     st.markdown('<p class="main-header">🧬 BMAL1文献检索系统 Dashboard</p>',
                 unsafe_allow_html=True)
 
-    db = init_db()
-    stats = db.get_statistics()
+    # 绑定数据库路径, 确保切换后缓存失效
+    dm = get_data_manager()
+    p = dm.ensure_database()
+    stats = get_stats_cached(str(p), p.stat().st_mtime)
 
     if not stats:
         st.warning("⚠️ 数据库为空或无法访问,请先上传数据库或执行搜索")
@@ -1038,8 +1074,9 @@ def page_browser():
     """文献浏览器页面"""
     st.markdown('<p class="main-header">📚 文献浏览器</p>', unsafe_allow_html=True)
 
-    db = init_db()
-    stats = db.get_statistics()
+    dm = get_data_manager()
+    p = dm.ensure_database()
+    stats = get_stats_cached(str(p), p.stat().st_mtime)
 
     if not stats:
         st.warning("⚠️ 数据库为空,请先上传数据库或执行搜索")
@@ -1071,11 +1108,9 @@ def page_browser():
     per_page = st.sidebar.selectbox("每页显示", [10, 20, 50, 100], index=1)
 
     # 执行搜索
-    df = db.search_papers(
-        keyword=keyword,
-        strategy=selected_strategy if selected_strategy != "全部" else "",
-        year_range=year_range
-    )
+    df_all = get_all_papers_cached(str(p), p.stat().st_mtime)
+    sel = selected_strategy if selected_strategy != "全部" else ""
+    df = filter_papers_df(df_all, keyword=keyword, strategy=sel, year_range=year_range)
 
     # 显示结果统计
     st.info(f"🔍 找到 **{len(df)}** 篇文献")
@@ -1165,8 +1200,9 @@ def page_analysis():
     """数据分析页面"""
     st.markdown('<p class="main-header">📈 数据分析</p>', unsafe_allow_html=True)
 
-    db = init_db()
-    df = db.get_all_papers()
+    dm = get_data_manager()
+    p = dm.ensure_database()
+    df = get_all_papers_cached(str(p), p.stat().st_mtime)
 
     if df.empty:
         st.warning("⚠️ 数据库为空,请先上传数据库或执行搜索")
@@ -1329,64 +1365,17 @@ def page_about():
     st.success("💡 使用左侧导航栏探索不同功能")
 
 
-# ==================== 主应用 ====================
+# ==================== 主应用（多页入口） ====================
 def main():
-    """主应用入口"""
-
-    # 侧边栏导航
     st.sidebar.title("🧬 BMAL1高级检索 v3.1")
-    st.sidebar.markdown("---")
-
-    page = st.sidebar.radio(
-        "导航菜单",
-        [
-            "💾 数据管理",
-            "📊 Dashboard",
-            "🔍 高级搜索",
-            "📚 文献浏览",
-            "📈 数据分析",
-            "⚙️ 设置",
-            "ℹ️ 关于"
-        ],
-        label_visibility="collapsed"
-    )
-
-    # 检查配置状态
-    config_manager = init_config_manager()
-    if not config_manager.is_configured() and page not in ["⚙️ 设置", "💾 数据管理", "ℹ️ 关于"]:
-        st.sidebar.markdown("---")
-        st.sidebar.markdown(
-            '<div class="warning-box">⚠️ 请先配置API</div>',
-            unsafe_allow_html=True
-        )
-
-    st.sidebar.markdown("---")
-    st.sidebar.info("💡 **v3.1**: 数据本地化,零云端占用")
-
-    # 页面路由
-    if page == "💾 数据管理":
-        page_data_management()
-    elif page == "📊 Dashboard":
-        page_dashboard()
-    elif page == "🔍 高级搜索":
-        page_advanced_search()
-    elif page == "📚 文献浏览":
-        page_browser()
-    elif page == "📈 数据分析":
-        page_analysis()
-    elif page == "⚙️ 设置":
-        page_settings()
-    else:
-        page_about()
-
-    # 页脚
+    st.sidebar.info("💡 使用左侧 Pages 导航访问各功能页面")
     st.sidebar.markdown("---")
     st.sidebar.markdown(
-        '<p style="text-align: center; color: #999; font-size: 0.8rem;">'
-        '© 2025 KOOI Research Assistant<br>BMAL1文献检索系统 v3.1'
-        '</p>',
+        '<p style="text-align: center; color: #999; font-size: 0.8rem;">© 2025 KOOI Research Assistant</p>',
         unsafe_allow_html=True
     )
+    st.markdown('<p class="main-header">🧬 BMAL1文献检索系统</p>', unsafe_allow_html=True)
+    st.success("欢迎使用 v3.1 最佳实践版。请通过左侧 Pages 进入各页面。")
 
 
 if __name__ == "__main__":

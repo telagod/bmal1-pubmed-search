@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 import json
 import os
+import importlib.util
 
 
 @dataclass
@@ -109,13 +110,30 @@ class ConfigManager:
         else:
             self.pubmed_config = PubMedConfig()
 
-        # 尝试从.env文件加载（如果配置为空）
-        if not self.pubmed_config.email or not self.pubmed_config.api_key:
+        # 优先从 Streamlit Secrets 加载（若可用且尚未配置）
+        if (not self.pubmed_config.email) or (not self.pubmed_config.api_key):
+            spec = importlib.util.find_spec("streamlit")
+            if spec is not None:
+                import streamlit as st  # noqa: WPS433
+                if hasattr(st, "secrets"):
+                    email = st.secrets.get('pubmed_email', '')
+                    key = st.secrets.get('api_key', '')
+                    if email:
+                        self.pubmed_config.email = email
+                    if key:
+                        self.pubmed_config.api_key = key
+
+        # 再尝试从.env文件加载（如果仍为空）
+        if (not self.pubmed_config.email) or (not self.pubmed_config.api_key):
             self._load_from_env()
 
     def _load_from_env(self):
         """从.env文件加载配置"""
-        env_path = Path(__file__).parent.parent / ".env"
+        # 优先使用当前模块所在目录的 .env
+        # 回退到项目根目录的 .env（若存在）
+        here_env = Path(__file__).parent / ".env"
+        root_env = Path(__file__).parent.parent / ".env"
+        env_path = here_env if here_env.exists() else root_env
 
         if env_path.exists():
             try:

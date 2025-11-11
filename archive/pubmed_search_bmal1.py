@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Archived: superseded by pubmed_search_v2.py. Not used by app.
 """
 BMAL1文献检索脚本
 使用PubMed API进行文献检索并保存结果

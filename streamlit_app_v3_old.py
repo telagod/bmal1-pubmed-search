@@ -1,20 +1,17 @@
 #!/usr/bin/env python3
 """
-BMAL1文献检索系统 - v3.1 最佳实践版
-========================================
+BMAL1文献检索系统 - 高级版 Streamlit WebUI
+==========================================
 特性:
-- 本地化数据管理,不占用云端资源
-- 数据库上传/下载功能
 - 可配置的PubMed邮箱和API密钥
 - 高级自定义搜索
 - 搜索历史管理
 - 交互式Dashboard
 - 文献浏览与分析
-- 默认深色模式
 
 作者: KOOI Research Assistant
 日期: 2025-11-10
-版本: v3.1
+版本: v3.0
 """
 
 import streamlit as st
@@ -33,7 +30,6 @@ import re
 from config_manager import ConfigManager, SearchParams, PubMedConfig
 from advanced_search import AdvancedPubMedSearchEngine, create_search_engine
 from pubmed_search_v2 import PaperDatabase, setup_logging
-from local_data_manager import get_data_manager
 
 # ==================== 页面配置 ====================
 st.set_page_config(
@@ -43,13 +39,13 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ==================== 自定义CSS (深色模式优化) ====================
+# ==================== 自定义CSS ====================
 st.markdown("""
 <style>
     .main-header {
         font-size: 2.5rem;
         font-weight: bold;
-        color: #4FC3F7;
+        color: #1f77b4;
         text-align: center;
         padding: 1rem 0;
     }
@@ -59,7 +55,7 @@ st.markdown("""
         border-radius: 10px;
         color: white;
         text-align: center;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
     .stat-number {
         font-size: 2.5rem;
@@ -71,25 +67,25 @@ st.markdown("""
         opacity: 0.9;
     }
     .paper-card {
-        background: #1E1E1E;
+        background: #f8f9fa;
         padding: 1.5rem;
         border-radius: 8px;
-        border-left: 4px solid #4FC3F7;
+        border-left: 4px solid #1f77b4;
         margin-bottom: 1rem;
     }
     .paper-title {
         font-size: 1.2rem;
         font-weight: bold;
-        color: #FAFAFA;
+        color: #2c3e50;
         margin-bottom: 0.5rem;
     }
     .paper-meta {
-        color: #B0B0B0;
+        color: #7f8c8d;
         font-size: 0.9rem;
     }
     .keyword-tag {
-        background: #2E4057;
-        color: #4FC3F7;
+        background: #e3f2fd;
+        color: #1976d2;
         padding: 0.3rem 0.6rem;
         border-radius: 15px;
         font-size: 0.85rem;
@@ -97,33 +93,33 @@ st.markdown("""
         display: inline-block;
     }
     .success-box {
-        background: #1B5E20;
-        border: 1px solid #2E7D32;
-        color: #A5D6A7;
+        background: #d4edda;
+        border: 1px solid #c3e6cb;
+        color: #155724;
         padding: 1rem;
         border-radius: 5px;
         margin: 1rem 0;
     }
     .error-box {
-        background: #B71C1C;
-        border: 1px solid #C62828;
-        color: #EF9A9A;
+        background: #f8d7da;
+        border: 1px solid #f5c6cb;
+        color: #721c24;
         padding: 1rem;
         border-radius: 5px;
         margin: 1rem 0;
     }
     .warning-box {
-        background: #F57F17;
-        border: 1px solid #F9A825;
-        color: #FFF9C4;
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        color: #856404;
         padding: 1rem;
         border-radius: 5px;
         margin: 1rem 0;
     }
     .info-box {
-        background: #01579B;
-        border: 1px solid #0277BD;
-        color: #B3E5FC;
+        background: #d1ecf1;
+        border: 1px solid #bee5eb;
+        color: #0c5460;
         padding: 1rem;
         border-radius: 5px;
         margin: 1rem 0;
@@ -275,154 +271,11 @@ def init_config_manager():
 @st.cache_resource
 def init_db():
     """初始化数据库连接（带缓存）"""
-    # 使用数据管理器确保数据库存在
-    data_manager = get_data_manager()
-    db_path = data_manager.ensure_database()
+    db_path = Path(__file__).parent / "results" / "bmal1_papers.db"
     return PaperDB(db_path)
 
 
-# ==================== 页面：数据管理 (首页) ====================
-def page_data_management():
-    """数据管理页面"""
-    st.markdown('<p class="main-header">💾 数据管理</p>', unsafe_allow_html=True)
-
-    st.markdown("""
-    <div class="info-box">
-    💡 <b>v3.1 核心理念</b>: 数据本地化管理,不占用云端资源
-    <br><br>
-    <b>使用流程</b>:
-    <br>1. 上传已有数据库文件(如果有)
-    <br>2. 或者直接开始搜索,系统会自动创建临时数据库
-    <br>3. 搜索完成后,<b>务必下载数据库到本地保存</b>
-    <br>4. 下次使用时,上传之前的数据库继续使用
-    </div>
-    """, unsafe_allow_html=True)
-
-    data_manager = get_data_manager()
-
-    st.markdown("---")
-    st.markdown("## 📤 数据库上传")
-
-    col1, col2 = st.columns([2, 1])
-
-    with col1:
-        uploaded_file = st.file_uploader(
-            "上传已有的数据库文件 (.db)",
-            type=['db'],
-            help="上传之前下载的数据库文件,继续使用之前的数据"
-        )
-
-        if uploaded_file:
-            if st.button("📥 确认上传", use_container_width=True):
-                with st.spinner("正在上传数据库..."):
-                    if data_manager.upload_database(uploaded_file):
-                        st.markdown(
-                            '<div class="success-box">✅ 数据库上传成功!</div>',
-                            unsafe_allow_html=True
-                        )
-                        st.rerun()
-                    else:
-                        st.markdown(
-                            '<div class="error-box">❌ 数据库文件无效或上传失败</div>',
-                            unsafe_allow_html=True
-                        )
-
-    with col2:
-        st.info("""
-        **支持的文件**:
-        - 之前下载的 .db 文件
-        - v2.0/v3.0 版本的数据库
-
-        **文件大小限制**: 200MB
-        """)
-
-    st.markdown("---")
-    st.markdown("## 📊 当前数据库信息")
-
-    db_info = data_manager.get_database_info()
-
-    if db_info.get('exists'):
-        col1, col2, col3, col4 = st.columns(4)
-
-        with col1:
-            st.markdown(f"""
-            <div class="stat-box">
-                <div class="stat-label">📚 文献数</div>
-                <div class="stat-number">{db_info.get('paper_count', 0)}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with col2:
-            st.markdown(f"""
-            <div class="stat-box">
-                <div class="stat-label">🔍 搜索次数</div>
-                <div class="stat-number">{db_info.get('search_count', 0)}</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with col3:
-            st.markdown(f"""
-            <div class="stat-box">
-                <div class="stat-label">💿 文件大小</div>
-                <div class="stat-number">{db_info.get('size_mb', 0)}</div>
-                <div class="stat-label">MB</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with col4:
-            st.markdown(f"""
-            <div class="stat-box">
-                <div class="stat-label">✅ 状态</div>
-                <div class="stat-number">已就绪</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        st.markdown("---")
-        st.markdown("## 📥 数据库管理")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            # 下载数据库
-            db_bytes = data_manager.download_database()
-            if db_bytes:
-                st.download_button(
-                    label="📥 下载当前数据库",
-                    data=db_bytes,
-                    file_name=f"bmal1_papers_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db",
-                    mime="application/octet-stream",
-                    use_container_width=True,
-                    help="下载数据库到本地保存,下次使用时可以上传"
-                )
-
-        with col2:
-            # 清空数据库
-            if st.button("🗑️ 清空当前数据库", use_container_width=True, type="secondary"):
-                if 'confirm_clear' not in st.session_state:
-                    st.session_state.confirm_clear = False
-
-                if not st.session_state.confirm_clear:
-                    st.session_state.confirm_clear = True
-                    st.warning("⚠️ 再次点击确认清空数据库")
-                else:
-                    data_manager.clear_database()
-                    st.session_state.confirm_clear = False
-                    st.success("✅ 数据库已清空")
-                    st.rerun()
-
-    else:
-        st.markdown("""
-        <div class="warning-box">
-        ⚠️ <b>当前没有数据库</b>
-        <br><br>
-        您可以:
-        <br>1. 上传已有的数据库文件
-        <br>2. 或者直接去"🔍 高级搜索"页面开始搜索,系统会自动创建数据库
-        </div>
-        """, unsafe_allow_html=True)
-
-
-# ==================== 页面:设置 ====================
+# ==================== 页面：设置 ====================
 def page_settings():
     """设置页面"""
     st.markdown('<p class="main-header">⚙️ 系统设置</p>', unsafe_allow_html=True)
@@ -434,8 +287,8 @@ def page_settings():
 
     st.markdown("""
     <div class="info-box">
-    💡 <b>提示</b>: 配置PubMed邮箱和API密钥后,您可以直接在Web界面进行文献检索。
-    <br>如果您已经在.env文件中配置,这里会自动加载。
+    💡 <b>提示</b>: 配置PubMed邮箱和API密钥后，您可以直接在Web界面进行文献检索。
+    <br>如果您已经在.env文件中配置，这里会自动加载。
     </div>
     """, unsafe_allow_html=True)
 
@@ -507,7 +360,7 @@ def page_settings():
                 )
 
                 st.markdown(
-                    '<div class="success-box">✅ 配置已成功保存!</div>',
+                    '<div class="success-box">✅ 配置已成功保存！</div>',
                     unsafe_allow_html=True
                 )
                 st.rerun()
@@ -525,7 +378,7 @@ def page_settings():
             )
         else:
             st.markdown(
-                '<div class="warning-box">⚠️ <b>配置状态</b>: 未配置</div>',
+                '<div class="warning-box">⚠️  <b>配置状态</b>: 未配置</div>',
                 unsafe_allow_html=True
             )
 
@@ -574,7 +427,7 @@ def page_settings():
             st.rerun()
 
 
-# ==================== 页面:高级搜索 ====================
+# ==================== 页面：高级搜索 ====================
 def page_advanced_search():
     """高级搜索页面"""
     st.markdown('<p class="main-header">🔍 高级搜索</p>', unsafe_allow_html=True)
@@ -584,7 +437,7 @@ def page_advanced_search():
     # 检查配置
     if not config_manager.is_configured():
         st.markdown(
-            '<div class="warning-box">⚠️ 请先在"⚙️ 设置"页面配置PubMed API</div>',
+            '<div class="warning-box">⚠️  请先在"设置"页面配置PubMed API</div>',
             unsafe_allow_html=True
         )
         st.stop()
@@ -610,14 +463,14 @@ def _simple_search_form(config_manager):
         search_name = st.text_input(
             "🏷️ 搜索名称",
             value="My Search",
-            help="给本次搜索起个名字,便于管理"
+            help="给本次搜索起个名字，便于管理"
         )
 
         query = st.text_area(
             "🔎 查询字符串",
             value="BMAL1 AND Alzheimer",
             height=100,
-            help="输入PubMed查询字符串,例如: BMAL1 AND (circadian OR clock)"
+            help="输入PubMed查询字符串，例如: BMAL1 AND (circadian OR clock)"
         )
 
         col1, col2, col3 = st.columns(3)
@@ -680,7 +533,7 @@ def _advanced_search_form(config_manager):
             keywords_input = st.text_input(
                 "关键词（用逗号分隔）",
                 value="BMAL1, circadian, clock",
-                help="输入多个关键词,用逗号分隔"
+                help="输入多个关键词，用逗号分隔"
             )
 
         with col2:
@@ -841,13 +694,12 @@ def _execute_search(config_manager, query: str, name: str,
     # 创建搜索引擎
     engine = create_search_engine()
 
-    # 使用数据管理器获取数据库路径
-    data_manager = get_data_manager()
-    db_path = data_manager.ensure_database()
-    export_dir = Path(__file__).parent / "results"
-
     # 显示进度
     with st.spinner("🔍 正在搜索..."):
+        # 执行搜索
+        db_path = Path(__file__).parent / "results" / "bmal1_papers.db"
+        export_dir = Path(__file__).parent / "results"
+
         try:
             result = engine.execute_search(
                 search_params,
@@ -860,8 +712,8 @@ def _execute_search(config_manager, query: str, name: str,
             if result['success']:
                 st.markdown(
                     f'<div class="success-box">'
-                    f'✅ <b>搜索成功!</b><br>'
-                    f'找到 {result["total_count"]} 篇文献,成功获取 {result["fetched_count"]} 篇 '
+                    f'✅ <b>搜索成功！</b><br>'
+                    f'找到 {result["total_count"]} 篇文献，成功获取 {result["fetched_count"]} 篇 '
                     f'（成功率: {result["success_rate"]}）'
                     f'</div>',
                     unsafe_allow_html=True
@@ -873,18 +725,7 @@ def _execute_search(config_manager, query: str, name: str,
                     for format_type, filepath in result['exported_files'].items():
                         st.markdown(f"- {format_type.upper()}: `{Path(filepath).name}`")
 
-                # v3.1: 提示下载数据库
-                st.markdown("---")
-                st.markdown("""
-                <div class="info-box">
-                💡 <b>重要提示</b>: 数据已保存到临时数据库
-                <br><br>
-                <b>请务必前往"💾 数据管理"页面下载数据库到本地保存!</b>
-                <br>否则应用重启后数据将丢失。
-                </div>
-                """, unsafe_allow_html=True)
-
-                st.success("您现在可以在\"📊 Dashboard\"和\"📚 文献浏览\"中查看结果")
+                st.success("数据已保存到数据库，您可以在\"文献浏览器\"中查看结果")
 
             else:
                 st.markdown(
@@ -906,10 +747,10 @@ def _execute_search(config_manager, query: str, name: str,
 
 
 # ==================== 从v1导入其他页面 ====================
-# 这些页面保持不变,从v3.0复制过来
+# 这些页面保持不变，从v1复制过来
 
 def page_dashboard():
-    """Dashboard页面"""
+    """Dashboard页面 - 从v1复制"""
     st.markdown('<p class="main-header">🧬 BMAL1文献检索系统 Dashboard</p>',
                 unsafe_allow_html=True)
 
@@ -917,7 +758,7 @@ def page_dashboard():
     stats = db.get_statistics()
 
     if not stats:
-        st.warning("⚠️ 数据库为空或无法访问,请先上传数据库或执行搜索")
+        st.warning("⚠️  数据库为空或无法访问，请先执行搜索或检查数据库文件")
         return
 
     # 统计卡片
@@ -1035,14 +876,14 @@ def page_dashboard():
 
 
 def page_browser():
-    """文献浏览器页面"""
+    """文献浏览器页面 - 从v1复制"""
     st.markdown('<p class="main-header">📚 文献浏览器</p>', unsafe_allow_html=True)
 
     db = init_db()
     stats = db.get_statistics()
 
     if not stats:
-        st.warning("⚠️ 数据库为空,请先上传数据库或执行搜索")
+        st.warning("⚠️  数据库为空，请先执行搜索")
         return
 
     # 筛选器
@@ -1162,14 +1003,14 @@ def display_paper_card(paper):
 
 
 def page_analysis():
-    """数据分析页面"""
+    """数据分析页面 - 简化版"""
     st.markdown('<p class="main-header">📈 数据分析</p>', unsafe_allow_html=True)
 
     db = init_db()
     df = db.get_all_papers()
 
     if df.empty:
-        st.warning("⚠️ 数据库为空,请先上传数据库或执行搜索")
+        st.warning("⚠️  数据库为空，请先执行搜索")
         return
 
     # Tab导航
@@ -1258,43 +1099,27 @@ def page_about():
     st.markdown('<p class="main-header">ℹ️ 关于本系统</p>', unsafe_allow_html=True)
 
     st.markdown("""
-    ## 🧬 BMAL1文献检索系统 - v3.1 最佳实践版
+    ## 🧬 BMAL1文献检索系统 - 高级版
 
     ### 📖 项目简介
 
-    本系统是一个功能强大的PubMed文献检索和分析平台,专为BMAL1相关研究设计。
+    本系统是一个功能强大的PubMed文献检索和分析平台，专为BMAL1相关研究设计。
 
     ### ✨ 主要功能
 
-    - **💾 本地数据管理**: 数据完全本地化,不占用云端资源
-    - **⚙️ 灵活配置**: Web界面直接配置PubMed API
+    - **⚙️  灵活配置**: Web界面直接配置PubMed API
     - **🔍 高级搜索**: 支持复杂查询构建和自定义筛选
     - **📜 搜索历史**: 自动保存和管理搜索记录
     - **📚 文献浏览**: 强大的筛选、搜索、分页功能
     - **📊 数据分析**: 多维度可视化分析
-    - **🌙 深色模式**: 默认深色主题,更适合长时间阅读
+    - **💾 数据管理**: SQLite数据库持久化存储
 
-    ### 🆕 v3.1 新特性
+    ### 🆕 v3.0 新特性
 
-    1. **数据本地化**: 上传/下载数据库,完全控制自己的数据
-    2. **零云端占用**: 不依赖Streamlit Cloud持久化存储
-    3. **深色模式**: 默认深色主题,护眼舒适
-    4. **优化流程**: 页面顺序调整,更符合使用习惯
-
-    ### 📋 使用流程
-
-    **方式1: 上传已有数据（推荐）**
-    1. 进入"💾 数据管理"
-    2. 上传之前下载的数据库文件
-    3. 立即查看数据和分析结果
-    4. 可继续搜索添加新数据
-    5. 搜索后下载更新的数据库
-
-    **方式2: 从头开始**
-    1. 进入"⚙️ 设置"配置API
-    2. 进入"🔍 高级搜索"执行检索
-    3. 搜索完成后下载数据库文件
-    4. 下次访问时上传该文件继续使用
+    1. **可配置API**: 无需修改代码，直接在Web界面配置
+    2. **高级查询构建器**: 简单模式和高级模式双重支持
+    3. **搜索历史管理**: 自动记录，一键重新执行
+    4. **配置导入导出**: 方便备份和迁移
 
     ### 🛠️ 技术栈
 
@@ -1306,24 +1131,23 @@ def page_about():
     ### 👨‍💻 开发信息
 
     - **作者**: KOOI Research Assistant ฅ'ω'ฅ
-    - **版本**: v3.1 (最佳实践版)
+    - **版本**: v3.0 (高级版)
     - **更新时间**: 2025-11-10
     - **数据来源**: PubMed/NCBI
     """)
 
-    # 显示当前数据库信息
-    data_manager = get_data_manager()
-    db_info = data_manager.get_database_info()
+    db = init_db()
+    stats = db.get_statistics()
 
-    if db_info.get('exists'):
+    if stats:
         st.markdown("### 📊 当前数据统计")
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("文献数", db_info.get('paper_count', 0))
+            st.metric("总文献数", stats.get('total_papers', 0))
         with col2:
-            st.metric("搜索次数", db_info.get('search_count', 0))
+            st.metric("独特期刊", stats.get('unique_journals', 0))
         with col3:
-            st.metric("文件大小 (MB)", db_info.get('size_mb', 0))
+            st.metric("检索策略", len(stats.get('by_strategy', {})))
 
     st.markdown("---")
     st.success("💡 使用左侧导航栏探索不同功能")
@@ -1334,13 +1158,12 @@ def main():
     """主应用入口"""
 
     # 侧边栏导航
-    st.sidebar.title("🧬 BMAL1高级检索 v3.1")
+    st.sidebar.title("🧬 BMAL1高级检索")
     st.sidebar.markdown("---")
 
     page = st.sidebar.radio(
         "导航菜单",
         [
-            "💾 数据管理",
             "📊 Dashboard",
             "🔍 高级搜索",
             "📚 文献浏览",
@@ -1353,20 +1176,18 @@ def main():
 
     # 检查配置状态
     config_manager = init_config_manager()
-    if not config_manager.is_configured() and page not in ["⚙️ 设置", "💾 数据管理", "ℹ️ 关于"]:
+    if not config_manager.is_configured() and page != "⚙️ 设置":
         st.sidebar.markdown("---")
         st.sidebar.markdown(
-            '<div class="warning-box">⚠️ 请先配置API</div>',
+            '<div class="warning-box">⚠️  请先配置API</div>',
             unsafe_allow_html=True
         )
 
     st.sidebar.markdown("---")
-    st.sidebar.info("💡 **v3.1**: 数据本地化,零云端占用")
+    st.sidebar.info("💡 **提示**: v3.0 高级版支持Web界面配置")
 
     # 页面路由
-    if page == "💾 数据管理":
-        page_data_management()
-    elif page == "📊 Dashboard":
+    if page == "📊 Dashboard":
         page_dashboard()
     elif page == "🔍 高级搜索":
         page_advanced_search()
@@ -1383,7 +1204,7 @@ def main():
     st.sidebar.markdown("---")
     st.sidebar.markdown(
         '<p style="text-align: center; color: #999; font-size: 0.8rem;">'
-        '© 2025 KOOI Research Assistant<br>BMAL1文献检索系统 v3.1'
+        '© 2025 KOOI Research Assistant<br>BMAL1文献检索系统 v3.0'
         '</p>',
         unsafe_allow_html=True
     )

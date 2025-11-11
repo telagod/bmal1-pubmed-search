@@ -16,4 +16,4 @@ maxUploadSize = 200
 gatherUsageStats = false
 
 [client]
-showSidebarNavigation = true
+showSidebarNavigation = false
